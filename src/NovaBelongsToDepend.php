@@ -24,9 +24,8 @@ class NovaBelongsToDepend extends BelongsTo
 
     public $titleKey;
 
-    public $dependsOn = [];
-
-    public $dependsMap = [];
+    public $dependKey;
+    public $dependsOn;
 
     public $optionResolveCallback = null;
     public $options = [];
@@ -80,12 +79,9 @@ class NovaBelongsToDepend extends BelongsTo
         return $this;
     }
 
-    public function dependsOn(string ...$classNames): NovaBelongsToDepend
+    public function dependsOn($relationship, $mixin = false)
     {
-        foreach ($classNames as &$value) {
-            $value = Str::lower($value);
-        }
-        $this->dependsOn = $classNames;
+        $this->dependsOn = Str::lower($relationship);
         return $this;
     }
 
@@ -95,17 +91,17 @@ class NovaBelongsToDepend extends BelongsTo
         return $this;
     }
 
-    /**
-     * @param $parentResourceClass
-     * @return self
-     */
-    public function setResourceParentClass($parentResourceClass)
-    {
-        $this->resourceParentClass = $parentResourceClass;
-        return $this;
-    }
+  /**
+   * @param $parentResourceClass
+   * @return self
+   */
+  public function setResourceParentClass($parentResourceClass)
+  {
+    $this->resourceParentClass = $parentResourceClass;
+    return $this;
+  }
 
-    public function hideLinkToResourceFromDetail()
+  public function hideLinkToResourceFromDetail()
     {
         $this->showLinkToResourceFromDetail = false;
         return $this;
@@ -135,13 +131,19 @@ class NovaBelongsToDepend extends BelongsTo
         $foreign = $resource->{$this->attribute}();
         $this->foreignKeyName = $foreign->getForeignKeyName();
 
+        if ($this->dependsOn) {
+            $this->dependKey = $resource->{$this->dependsOn}()->getForeignKeyName();
+        }
+
         if ($resource->relationLoaded($this->attribute)) {
             $value = $resource->getRelation($this->attribute);
-        } else {
-            $value = $resource->{$this->attribute}()->withoutGlobalScopes()->first();
         }
-        
-        if ($value) {
+
+        if (empty($value)) {
+            $value = $resource->{$this->attribute}()->withoutGlobalScopes()->getResults();
+        }
+
+        if (!empty($value)) {
             $this->valueKey = $value->getKey();
             $this->value = $this->formatDisplayValue($value);
         }
@@ -170,8 +172,8 @@ class NovaBelongsToDepend extends BelongsTo
     /**
      * Hydrate the given attribute on the model based on the incoming request.
      *
-     * @param \Laravel\Nova\Http\Requests\NovaRequest $request
-     * @param object $model
+     * @param  \Laravel\Nova\Http\Requests\NovaRequest  $request
+     * @param  object  $model
      * @return mixed
      */
     public function fillForAction(NovaRequest $request, $model)
@@ -218,7 +220,7 @@ class NovaBelongsToDepend extends BelongsTo
         return array_merge([
             'options' => $this->options,
             'valueKey' => $this->valueKey,
-            'dependsMap' => $this->dependsMap,
+            'dependKey' => $this->dependKey,
             'dependsOn' => $this->dependsOn,
             'titleKey' => $this->titleKey,
             'resourceParentClass' => $this->resourceParentClass,
@@ -227,7 +229,7 @@ class NovaBelongsToDepend extends BelongsTo
             'foreignKeyName' => $this->foreignKeyName,
             'fallback' => $this->fallback,
             'showLinkToResourceFromDetail' => $this->showLinkToResourceFromDetail,
-            'showLinkToResourceFromIndex' => $this->showLinkToResourceFromIndex,
+            'showLinkToResourceFromIndex' => $this->showLinkToResourceFromIndex
         ], $this->meta);
     }
 }
